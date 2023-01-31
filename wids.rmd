@@ -1,0 +1,187 @@
+---
+title: "wids datathon 2023"
+author: "chad allison"
+date: '2023-01-31'
+output: github_document
+---
+
+___
+
+### setup
+
+```{r message = F, warning = F}
+library(tidyverse)
+library(tidymodels)
+library(tvthemes)
+library(janitor)
+library(lubridate)
+library(skimr)
+options(scipen = 999)
+
+adjust_theme = theme(panel.grid.major = element_line(linewidth = 0.5, colour = "#D6D0C4"),
+                     panel.grid.minor = element_line(linewidth = 0.5, colour = "#D6D0C4"))
+```
+
+___
+
+### data import
+
+```{r}
+train = read_csv("train_data.csv", col_types = cols()) |> clean_names()
+test = read_csv("test_data.csv", col_types = cols()) |> clean_names()
+sample_sol = read_csv("sample_solution.csv", col_types = cols()) |> clean_names()
+paste0("training dimensions: ", nrow(train), " rows x ", ncol(train), " columns")
+paste0("testing dimensions: ", nrow(test), " rows x ", ncol(test), " columns")
+```
+
+___
+
+### finding variable types
+
+```{r}
+paste0(ncol(select(train, where(is.numeric))), " numeric variables; ",
+       ncol(select(train, where(is.character))), " character variables")
+```
+
+___
+
+### reformatting `startdate` and `climateregions_climateregion` variables
+
+```{r}
+train = train |>
+  mutate(startdate = parse_date(startdate, format = "%m/%d/%y"),
+         year = year(startdate),
+         month = month(startdate),
+         day = day(startdate),
+         climateregions_climateregion = as.factor(climateregions_climateregion)) |>
+  rename(climate_region = climateregions_climateregion)
+
+train |>
+  select(startdate, year, month, day, climate_region) |>
+  skim()
+```
+
+___
+
+### counting climate regions
+
+```{r}
+train |>
+  count(climate_region) |>
+  ggplot(aes(reorder(climate_region, -n), n)) +
+  geom_col(aes(fill = climate_region)) +
+  geom_text(aes(label = n), size = 3, vjust = -0.5) +
+  theme_avatar() +
+  labs(x = "climate region", y = "count", title = "counts of climate regions") +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none") +
+  adjust_theme
+```
+
+___
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### outcome variable distribution
+
+```{r}
+train |>
+  ggplot(aes(contest_tmp2m_14d_tmp2m)) +
+  geom_histogram(bins = 25, col = "black", fill = "#81A384") +
+  theme_avatar() +
+  labs(x = "outcome variable: contest_tmp2m_14d_tmp2m",
+       y = "count", title = "distribution of outcome variable") +
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.major = element_line(linewidth = 0.5, colour = "#CFC7B7"),
+        panel.grid.minor = element_line(linewidth = 0.5, colour = "#CFC7B7"))
+```
+
+___
+
+### boxplots
+
+```{r}
+train |>
+  ggplot(aes(reorder(climate_region, contest_tmp2m_14d_tmp2m), contest_tmp2m_14d_tmp2m)) +
+  geom_boxplot(aes(fill = climate_region)) +
+  coord_flip() +
+  theme_avatar() +
+  labs(x = "climate region", y = "outcome variable: contest_tmp2m_14d_tmp2m",
+       title = "boxplots of outcome variable by region") +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none",
+        panel.grid.major = element_line(linewidth = 0.5, colour = "#CFC7B7"),
+        panel.grid.minor = element_line(linewidth = 0.5, colour = "#CFC7B7"))
+```
+
+___
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
