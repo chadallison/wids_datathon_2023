@@ -5,7 +5,7 @@ chad allison
 
 ------------------------------------------------------------------------
 
-[kaggle link](https://www.kaggle.com/code/khsamaha/eda-wids-datathon-2023)
+[kaggle link](https://www.kaggle.com/competitions/widsdatathon2023/overview)
 
 ------------------------------------------------------------------------
 
