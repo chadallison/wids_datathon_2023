@@ -189,6 +189,25 @@ fig1 / fig2
 
 ___
 
+### finding average monthly temperatures
+
+```{r}
+train |>
+  mutate(month = month(month, label = T),
+         year = factor(year)) |>
+  group_by(year, month) |>
+  summarise(mean_temp = mean(contest_tmp2m_14d_tmp2m),
+            .groups = "drop") |>
+  ggplot(aes(month, mean_temp)) +
+  geom_line(aes(group = year, col = year), linewidth = 2, alpha = 0.5) +
+  facet_wrap(vars(year), nrow = 3) +
+  theme_custom +
+  labs(x = "month", y = "average temperature (\u00B0C)",
+       title = "average monthly temperature (\u00B0C) by year",
+       subtitle = "note that 2015 is our only year of complete data") +
+  theme(legend.position = "none",
+        plot.subtitle = element_text(hjust = 0.5, vjust = 1.75, size = 9, face = "italic"))
+```
 
 
 
