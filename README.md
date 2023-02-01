@@ -266,41 +266,94 @@ train |>
 
 ![](wids_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
-### outcome variable distribution
+------------------------------------------------------------------------
+
+### shapiro test for normality
+
+``` r
+shapiro_sample = train |>
+  pull(contest_tmp2m_14d_tmp2m) |>
+  sample(5000) |>
+  shapiro.test()
+
+shapiro_sample
+```
+
+    ## 
+    ##  Shapiro-Wilk normality test
+    ## 
+    ## data:  sample(pull(train, contest_tmp2m_14d_tmp2m), 5000)
+    ## W = 0.98957, p-value < 0.00000000000000022
+
+because of the p-value less than 0.05, we cannot assume that the
+population this data is sampled from is normally distributed.
+
+------------------------------------------------------------------------
+
+### viewing distribution of target variable
 
 ``` r
 train |>
   ggplot(aes(contest_tmp2m_14d_tmp2m)) +
-  geom_histogram(bins = 25, col = "black", fill = "#81A384") +
-  theme_avatar() +
-  labs(x = "outcome variable: contest_tmp2m_14d_tmp2m",
-       y = "count", title = "distribution of outcome variable") +
-  theme(plot.title = element_text(hjust = 0.5),
-        panel.grid.major = element_line(linewidth = 0.5, colour = "#CFC7B7"),
-        panel.grid.minor = element_line(linewidth = 0.5, colour = "#CFC7B7"))
+  geom_histogram(bins = 30, col = "black", fill = "#90B48F") +
+  theme_custom +
+  labs(x = "target variable: contest_tmp2m_14d_tmp2m",
+       title = "histogram of target variable")
 ```
 
-![](wids_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](wids_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 ------------------------------------------------------------------------
 
-### boxplots
+### distribution of target variable by year
+
+``` r
+train |>
+  mutate(year = factor(year)) |>
+  ggplot(aes(contest_tmp2m_14d_tmp2m)) +
+  geom_histogram(aes(fill = year), bins = 30, col = "black") +
+  scale_fill_manual(values = c("#96B3CD", "#90B48F", "#BEA2C3")) +
+  theme_custom +
+  labs(x = "target variable: contest_tmp2m_14d_tmp2m",
+       title = "histogram of target variable by year") +
+  facet_wrap(vars(year), nrow = 3) +
+  theme(legend.position = "none")
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### distribution of target variable by region
+
+``` r
+train |>
+  mutate(year = factor(year)) |>
+  ggplot(aes(contest_tmp2m_14d_tmp2m)) +
+  geom_histogram(bins = 30, col = "black", fill = "#90B48F") +
+  theme_custom +
+  labs(x = "target variable: contest_tmp2m_14d_tmp2m",
+       title = "histogram of target variable by year") +
+  facet_wrap(vars(climate_region)) +
+  theme(legend.position = "none")
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+
+### USE GGRIDGES TO GET THE RIDGELINE PLOTS HERE
 
 ``` r
 train |>
   ggplot(aes(reorder(climate_region, contest_tmp2m_14d_tmp2m), contest_tmp2m_14d_tmp2m)) +
   geom_boxplot(aes(fill = climate_region)) +
   coord_flip() +
-  theme_avatar() +
-  labs(x = "climate region", y = "outcome variable: contest_tmp2m_14d_tmp2m",
-       title = "boxplots of outcome variable by region") +
-  theme(plot.title = element_text(hjust = 0.5),
-        legend.position = "none",
-        panel.grid.major = element_line(linewidth = 0.5, colour = "#CFC7B7"),
-        panel.grid.minor = element_line(linewidth = 0.5, colour = "#CFC7B7"))
+  theme_custom +
+  labs(x = "target variable: contest_tmp2m_14d_tmp2m", y = "climate region",
+       title = "boxplots of target variable by region") +
+  theme(legend.position = "none")
 ```
 
-![](wids_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](wids_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 ------------------------------------------------------------------------
 
@@ -310,4 +363,4 @@ train |>
 tictoc::toc()
 ```
 
-    ## 28.5 sec elapsed
+    ## 30.82 sec elapsed
