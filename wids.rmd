@@ -7,19 +7,27 @@ output: github_document
 
 ___
 
+[kaggle link](https://www.kaggle.com/competitions/widsdatathon2023/overview)
+
+___
+
 ### setup
 
 ```{r message = F, warning = F}
+tictoc::tic()
 library(tidyverse)
 library(tidymodels)
 library(tvthemes)
 library(janitor)
 library(lubridate)
 library(skimr)
+library(patchwork)
 options(scipen = 999)
 
-adjust_theme = theme(panel.grid.major = element_line(linewidth = 0.5, colour = "#D6D0C4"),
-                     panel.grid.minor = element_line(linewidth = 0.5, colour = "#D6D0C4"))
+theme_custom = theme_avatar() +
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.major = element_line(linewidth = 0.5, colour = "#D6D0C4"),
+        panel.grid.minor = element_line(linewidth = 0.5, colour = "#D6D0C4"))
 ```
 
 ___
@@ -68,14 +76,115 @@ ___
 ```{r}
 train |>
   count(climate_region) |>
+  mutate(pct = paste0(round(n / sum(n) * 100, 1), "%")) |>
   ggplot(aes(reorder(climate_region, -n), n)) +
   geom_col(aes(fill = climate_region)) +
-  geom_text(aes(label = n), size = 3, vjust = -0.5) +
+  geom_text(aes(label = pct), size = 3, vjust = -0.5) +
   theme_avatar() +
   labs(x = "climate region", y = "count", title = "counts of climate regions") +
+  theme_custom +
+  theme(legend.position = "none")
+```
+
+___
+
+### finding missing values
+
+```{r}
+data.frame(x = names(train), y = colSums(is.na(train))) |>
+  filter(y > 0) |>
+  ggplot(aes(reorder(x, y), y)) +
+  geom_col(aes(fill = x)) +
+  geom_text(aes(label = y), hjust = 1.25, size = 3) +
+  labs(x = NULL, y = "number of NA values",
+       title = "counts of missing values") +
+  coord_flip() +
+  theme_custom +
+  theme(legend.position = "none")
+```
+
+___
+
+### distribution of all missing values MAKE SURE TO REMOVE HEAD LINE
+
+```{r}
+vars_with_NAs = data.frame(col = names(train), n = colSums(is.na(train))) |>
+  filter(n > 0) |>
+  pull(col)
+
+train |>
+  select(index, all_of(vars_with_NAs)) |>
+  head(nrow(train) * 0.05) |> # REMOVE THIS LINE
+  pivot_longer(cols = -index, names_to = "var_name", values_to = "value") |>
+  mutate(is_na = is.na(value)) |>
+  ggplot(aes(var_name, index)) +
+  geom_tile(aes(fill = is_na), alpha = 0.75) +
+  scale_fill_manual(values = c("#71926B", "#BA5757"), labels = c("complete", "missing")) +
+  coord_flip() +
+  theme_custom +
+  labs(x = NULL, y = "index", fill = NULL,
+       title = "distribution of missing values - could we have a temporal pattern?") +
   theme(plot.title = element_text(hjust = 0.5),
-        legend.position = "none") +
-  adjust_theme
+        legend.position = "right")
+```
+
+___
+
+### checking distributions of missing variables before imputation
+
+```{r}
+train |>
+  select(all_of(vars_with_NAs)) |>
+  pivot_longer(everything()) |>
+  na.omit() |>
+  ggplot(aes(value)) +
+  geom_density(aes(fill = name), alpha = 0.4) +
+  annotate("text", x = 95, y = 0.025, fontface = "italic", size = 3.5,
+           label = "none of the variables look extremely\nskewed; we can impute with mean") +
+  theme_custom +
+  labs(title = "distributions of variables with missing values", fill = NULL) +
+  theme(legend.position = "right")
+```
+
+___
+
+### imputing missing data
+
+```{r}
+train = train |>
+  mutate(across(.cols = all_of(vars_with_NAs), ~ replace_na(., mean(., na.rm = T))))
+
+paste0("number of NA values in training data: ", sum(is.na(train)))
+```
+
+___
+
+### visualization of target variable
+
+```{r}
+fig1 = train |>
+  ggplot(aes(startdate, contest_tmp2m_14d_tmp2m)) +
+  geom_line(col = "#718F70", alpha = 0.5) +
+  geom_hline(yintercept = mean(train$contest_tmp2m_14d_tmp2m), col = "black") +
+  annotate("text", x = as_date("2015-01-01"), y = mean(train$contest_tmp2m_14d_tmp2m) - 2,
+           label = "avg. temp. (\u00B0C)", size = 3.5) +
+  labs(x = NULL, y = "target variable temp. (\u00B0C)",
+       title = paste0("average temperature over time: ", min(train$startdate),
+                      " to ", max(train$startdate))) +
+  theme_custom +
+  coord_cartesian(expand = F)
+
+fig2 = train |>
+  ggplot(aes(startdate, y = 1)) +
+  geom_tile(aes(fill = contest_tmp2m_14d_tmp2m)) +
+  scale_fill_stepsn(colors = c("#789DBB", "#D6D0C4", "#D38585")) +
+  theme_custom +
+  labs(x = NULL, y = NULL) +
+  theme(legend.position = "none",
+        axis.text = element_blank()) +
+  coord_cartesian(expand = F)
+
+fig1 / fig2
 ```
 
 ___
@@ -156,6 +265,11 @@ ___
 
 
 
+### script runtime
+
+```{r}
+tictoc::toc()
+```
 
 
 
