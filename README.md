@@ -21,6 +21,7 @@ library(janitor)
 library(lubridate)
 library(skimr)
 library(patchwork)
+library(ggridges)
 options(scipen = 999)
 
 theme_custom = theme_avatar() +
@@ -283,7 +284,7 @@ shapiro_sample
     ##  Shapiro-Wilk normality test
     ## 
     ## data:  sample(pull(train, contest_tmp2m_14d_tmp2m), 5000)
-    ## W = 0.98957, p-value < 0.00000000000000022
+    ## W = 0.98956, p-value < 0.00000000000000022
 
 because of the p-value less than 0.05, we cannot assume that the
 population this data is sampled from is normally distributed.
@@ -340,16 +341,17 @@ train |>
 
 ![](wids_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
-### USE GGRIDGES TO GET THE RIDGELINE PLOTS HERE
+------------------------------------------------------------------------
+
+### distribution of target variable by climate region
 
 ``` r
 train |>
-  ggplot(aes(reorder(climate_region, contest_tmp2m_14d_tmp2m), contest_tmp2m_14d_tmp2m)) +
-  geom_boxplot(aes(fill = climate_region)) +
-  coord_flip() +
+  ggplot(aes(contest_tmp2m_14d_tmp2m, reorder(climate_region, contest_tmp2m_14d_tmp2m))) +
+  geom_density_ridges(aes(fill = climate_region), col = "transparent", scale = 1) +
   theme_custom +
   labs(x = "target variable: contest_tmp2m_14d_tmp2m", y = "climate region",
-       title = "boxplots of target variable by region") +
+       title = "distribution of target variable in different climate regions") +
   theme(legend.position = "none")
 ```
 
@@ -357,10 +359,77 @@ train |>
 
 ------------------------------------------------------------------------
 
+### distribution of target variable in climate regions by season
+
+``` r
+train |>
+  mutate(season = case_when(month %in% c(12, 1, 2) ~ "winter",
+                            month %in% 3:5 ~ "spring",
+                            month %in% 6:8 ~ "summer",
+                            month %in% 9:11 ~ "fall")) |>
+  ggplot(aes(contest_tmp2m_14d_tmp2m, reorder(climate_region, contest_tmp2m_14d_tmp2m))) +
+  geom_density_ridges(aes(fill = climate_region), col = "transparent", scale = 1) +
+  theme_custom +
+  labs(x = "target variable: contest_tmp2m_14d_tmp2m", y = "climate region",
+       title = "distribution of target variable in different climate regions by season") +
+  theme(legend.position = "none") +
+  facet_wrap(vars(season))
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### visualizing variable correlations to target variable
+
+``` r
+fig_df = train |>
+  sample_n(10000) |>
+  select(where(is.numeric)) |>
+  cor() |>
+  data.frame() |>
+  select(contest_tmp2m_14d_tmp2m)
+
+fig_df |>
+  mutate(var = rownames(fig_df)) |>
+  ggplot(aes(reorder(var, contest_tmp2m_14d_tmp2m), contest_tmp2m_14d_tmp2m)) +
+  geom_col(aes(fill = var)) +
+  geom_hline(yintercept = -0.75, linetype = "dashed") +
+  geom_hline(yintercept = 0.75, linetype = "dashed") +
+  annotate("text", x = 10, y = 0.6, label = "threshold = 0.75", size = 3) +
+  annotate("text", x = 240, y = -0.585, label = "threshold = -0.75", size = 3) +
+  theme_custom +
+  labs(x = "variable", y = "correlation with target variable",
+       title = "variable correlations with target variable") +
+  theme(legend.position = "none",
+        axis.text.y = element_blank()) +
+  coord_flip(ylim = c(-1, 1))
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### time series visualization of target variable and relative humidity
+
+``` r
+train |>
+  sample_n(10000) |>
+  ggplot() +
+  geom_line(aes(startdate, contest_tmp2m_14d_tmp2m), alpha = 0.5, col = "#80A280") +
+  geom_line(aes(startdate, contest_rhum_sig995_14d_rhum), alpha = 0.55, col = "#D18989") +
+  scale_y_continuous(name = "target variable temperature (\u00B0C)",
+                     sec.axis = sec_axis(~ . * 1, name = "relative humidity")) +
+  theme_custom +
+  labs(x = NULL, title = "time series of temperature and relative humidity")
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+
 ### script runtime
 
 ``` r
 tictoc::toc()
 ```
 
-    ## 30.82 sec elapsed
+    ## 30.97 sec elapsed
