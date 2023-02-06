@@ -171,7 +171,7 @@ train |>
   coord_flip() +
   theme_custom +
   labs(x = NULL, y = "index", fill = NULL,
-       title = "distribution of missing values - could we have a temporal pattern?") +
+       title = "distribution of missing values - temporal pattern?") +
   theme(plot.title = element_text(hjust = 0.5),
         legend.position = "right")
 ```
@@ -284,7 +284,7 @@ shapiro_sample
     ##  Shapiro-Wilk normality test
     ## 
     ## data:  sample(pull(train, contest_tmp2m_14d_tmp2m), 5000)
-    ## W = 0.9895, p-value < 0.00000000000000022
+    ## W = 0.99019, p-value < 0.00000000000000022
 
 because of the p-value less than 0.05, we cannot assume that the
 population this data is sampled from is normally distributed.
@@ -415,8 +415,8 @@ fig_df |>
 ``` r
 train |>
   ggplot() +
+  geom_line(aes(startdate, contest_rhum_sig995_14d_rhum), alpha = 0.25, col = "#D18989") +
   geom_line(aes(startdate, contest_tmp2m_14d_tmp2m), alpha = 0.5, col = "#80A280") +
-  geom_line(aes(startdate, contest_rhum_sig995_14d_rhum), alpha = 0.55, col = "#D18989") +
   scale_y_continuous(name = "target variable temperature (\u00B0C)",
                      sec.axis = sec_axis(~ . * 1, name = "relative humidity")) +
   theme_custom +
@@ -429,13 +429,13 @@ train |>
 
 ------------------------------------------------------------------------
 
-### xxx
+### time series visualization of temperature and precipitation
 
 ``` r
 train |>
   ggplot() +
-  geom_line(aes(startdate, contest_tmp2m_14d_tmp2m), alpha = 0.5, col = "#80A280") +
   geom_line(aes(startdate, contest_precip_14d_precip / 10), alpha = 0.55, col = "#A5B7D4") +
+  geom_line(aes(startdate, contest_tmp2m_14d_tmp2m), alpha = 0.5, col = "#80A280") +
   scale_y_continuous(name = "target variable temperature (\u00B0C)",
                      sec.axis = sec_axis(~ . * 1, name = "precipitation (divided by 10 for scale)")) +
   theme_custom +
@@ -448,7 +448,7 @@ train |>
 
 ------------------------------------------------------------------------
 
-### monthly temp boxplot … adjust or delete
+### visualization of target variable by month
 
 ``` r
 ordered_months = c("2014-9", "2014-10", "2014-11", "2014-12",
@@ -458,12 +458,14 @@ ordered_months = c("2014-9", "2014-10", "2014-11", "2014-12",
                    "2016-5", "2016-6", "2016-7", "2016-8")
 
 train |>
+  sample_n(1000) |>
   mutate(month2 = paste0(year, "-", month),
          month2 = factor(month2, levels = rev(ordered_months))) |>
-  ggplot(aes(month2, contest_tmp2m_14d_tmp2m)) +
-  geom_boxplot(aes(fill = factor(month))) +
-  coord_flip() +
+  ggplot(aes(contest_tmp2m_14d_tmp2m, month2)) +
+  geom_density_ridges(aes(fill = factor(month)), col = "transparent", scale = 1) +
   theme_custom +
+  labs(x = "target variable: contest_tmp2m_14d_tmp2m", y = "month",
+       title = "distribution of target variable by month") +
   theme(legend.position = "none")
 ```
 
@@ -471,18 +473,78 @@ train |>
 
 ------------------------------------------------------------------------
 
-### xxx
+### visualizing relationship between precipitation and temperature
 
 ``` r
+cor_val = round(cor(train$contest_precip_14d_precip, train$contest_tmp2m_14d_tmp2m), 3)
+
 train |>
-  sample_n(10000) |>
+  sample_n(5000) |>
   ggplot(aes(contest_precip_14d_precip, contest_tmp2m_14d_tmp2m)) +
   geom_point(alpha = 0.25) +
   geom_smooth(formula = y ~ x, method = "loess", col = "springgreen4") +
-  theme_custom
+  theme_custom +
+  labs(x = "recorded precipitation", y = "recorded temperature",
+       title = "scatterplot of recorded precipitation and temperature") +
+  annotate("text", x = 200, y = -10, label = paste0("weak correlation;\ncoefficient = ", cor_val), size = 3.5, fontface = "italic")
 ```
 
 ![](wids_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### distribution of recorded precipitation
+
+``` r
+unlogged = train |>
+  ggplot(aes(contest_precip_14d_precip)) +
+  geom_histogram(bins = 30, fill = "#90B48F", col = "black") +
+  theme_custom +
+  labs(x = "recorded precipitation", y = "count",
+       title = "distribution of raw recorded precipitation v. log recorded precipitation")
+
+logged = train |>
+  mutate(log_precip = log(contest_precip_14d_precip)) |>
+  ggplot(aes(log_precip)) +
+  geom_histogram(bins = 30, fill = "#BEA2C3", col = "black") +
+  theme_custom +
+  labs(x = "log recorded precipitation", y = "count") +
+  annotate("text", x = -2.5, y = 25000, label = "precipitation variable is\nhighly right-skewed", fontface = "italic", size = 3.5)
+
+unlogged / logged
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### climate region work
+
+``` r
+train |>
+  group_by(climate_region) |>
+  summarise(mean_temp = round(mean(contest_tmp2m_14d_tmp2m), 3)) |>
+  arrange(desc(mean_temp))
+```
+
+    ## # A tibble: 15 × 2
+    ##    climate_region mean_temp
+    ##    <fct>              <dbl>
+    ##  1 BWh                22.2 
+    ##  2 BSh                20.9 
+    ##  3 Cfa                17.9 
+    ##  4 BWk                15.9 
+    ##  5 Csa                15.7 
+    ##  6 Csb                11.5 
+    ##  7 BSk                11.1 
+    ##  8 Cfb                10.8 
+    ##  9 Dfa                10.5 
+    ## 10 Dwa                 9.74
+    ## 11 Dsb                 9.04
+    ## 12 Dwb                 8.01
+    ## 13 Dsc                 7.34
+    ## 14 Dfb                 6.89
+    ## 15 Dfc                 4.41
 
 ### script runtime
 
@@ -490,4 +552,4 @@ train |>
 tictoc::toc()
 ```
 
-    ## 60.57 sec elapsed
+    ## 80.258 sec elapsed
