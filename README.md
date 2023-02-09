@@ -284,7 +284,7 @@ shapiro_sample
     ##  Shapiro-Wilk normality test
     ## 
     ## data:  sample(pull(train, contest_tmp2m_14d_tmp2m), 5000)
-    ## W = 0.99019, p-value < 0.00000000000000022
+    ## W = 0.99082, p-value < 0.00000000000000022
 
 because of the p-value less than 0.05, we cannot assume that the
 population this data is sampled from is normally distributed.
@@ -458,7 +458,7 @@ ordered_months = c("2014-9", "2014-10", "2014-11", "2014-12",
                    "2016-5", "2016-6", "2016-7", "2016-8")
 
 train |>
-  sample_n(1000) |>
+  slice_sample(prop = 0.1) |>
   mutate(month2 = paste0(year, "-", month),
          month2 = factor(month2, levels = rev(ordered_months))) |>
   ggplot(aes(contest_tmp2m_14d_tmp2m, month2)) +
@@ -479,14 +479,14 @@ train |>
 cor_val = round(cor(train$contest_precip_14d_precip, train$contest_tmp2m_14d_tmp2m), 3)
 
 train |>
-  sample_n(5000) |>
+  slice_sample(prop = 0.1) |>
   ggplot(aes(contest_precip_14d_precip, contest_tmp2m_14d_tmp2m)) +
   geom_point(alpha = 0.25) +
-  geom_smooth(formula = y ~ x, method = "loess", col = "springgreen4") +
+  geom_smooth(formula = y ~ x, method = "lm", col = "springgreen4") +
   theme_custom +
   labs(x = "recorded precipitation", y = "recorded temperature",
        title = "scatterplot of recorded precipitation and temperature") +
-  annotate("text", x = 200, y = -10, label = paste0("weak correlation;\ncoefficient = ", cor_val), size = 3.5, fontface = "italic")
+  annotate("text", x = 250, y = -10, label = paste0("weak correlation;\ncoefficient = ", cor_val), size = 3.5, fontface = "italic")
 ```
 
 ![](wids_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
@@ -518,33 +518,167 @@ unlogged / logged
 
 ------------------------------------------------------------------------
 
-### climate region work
+### climate regions
+
+we have fifteen climate regions in the data; [here is what each value
+indicates](https://en.wikipedia.org/wiki/K%C3%B6ppen_climate_classification#:~:text=The%20K%C3%B6ppen%20climate%20classification%20scheme,indicates%20the%20level%20of%20heat.).
+
+- BSh: hot semi-arid
+- BSk: cold semi-arid
+- BWh: hot desert
+- BWk: cold desert
+- Cfa: humid subtropical
+- Cfb: temperature oceanic or subtropical highland
+- Csa: hot summer Mediterranean
+- Csb: warm summer Mediterranean
+- Dfa: hot summer humid continental
+- Dfb: warm summer humid continental
+- Dfc: subarctic
+- Dsb: Mediterranean-influenced warm summer humid continental
+- Dsc: Mediterranean-influenced subarctic
+- Dwa: monsoon-influenced hot summer humid continental
+- Dwb: monsoon-influenced warm summer humid continental
+
+------------------------------------------------------------------------
+
+### visualizing temperature and humidity by climate region
 
 ``` r
 train |>
-  group_by(climate_region) |>
-  summarise(mean_temp = round(mean(contest_tmp2m_14d_tmp2m), 3)) |>
-  arrange(desc(mean_temp))
+  slice_sample(prop = 0.1) |>
+  ggplot(aes(contest_tmp2m_14d_tmp2m, contest_rhum_sig995_14d_rhum)) +
+  geom_point(aes(col = climate_region)) +
+  theme_custom +
+  theme(legend.position = "top") +
+  labs(x = "recorded temperature", y = "relative humidity",
+       title = "relationship between temperature, humidity, and climate region")
 ```
 
-    ## # A tibble: 15 × 2
-    ##    climate_region mean_temp
-    ##    <fct>              <dbl>
-    ##  1 BWh                22.2 
-    ##  2 BSh                20.9 
-    ##  3 Cfa                17.9 
-    ##  4 BWk                15.9 
-    ##  5 Csa                15.7 
-    ##  6 Csb                11.5 
-    ##  7 BSk                11.1 
-    ##  8 Cfb                10.8 
-    ##  9 Dfa                10.5 
-    ## 10 Dwa                 9.74
-    ## 11 Dsb                 9.04
-    ## 12 Dwb                 8.01
-    ## 13 Dsc                 7.34
-    ## 14 Dfb                 6.89
-    ## 15 Dfc                 4.41
+![](wids_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### visualizing temperature and humidity, highlighting BSk climate region (most common in the data)
+
+``` r
+train |>
+  slice_sample(prop = 0.01) |>
+  ggplot(aes(contest_tmp2m_14d_tmp2m, contest_rhum_sig995_14d_rhum)) +
+  geom_point() +
+  geom_smooth(formula = y ~ x, method = "loess", se = F, col = "springgreen4", linewidth = 2) +
+  gghighlight::gghighlight(climate_region == "BSk") +
+  theme_custom +
+  labs(x = "target variable temperature", y = "relative humidity",
+       title = "scatterplot of temperature and humidity (BSk climate region highlighted)")
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### visualizing elevation
+
+``` r
+train |>
+  ggplot(aes(elevation_elevation)) +
+  geom_histogram(bins = 30, col = "black", fill = "#BBA3C1") +
+  theme_custom +
+  labs(x = "elevation", y = "count", title = "distribution of elevation")
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### visualizing relationship between elevation and humidity
+
+``` r
+elev_groups = train |>
+  mutate(elev_group = cut_number(elevation_elevation, 5)) |>
+  count(elev_group) |>
+  pull(elev_group)
+
+train |>
+  mutate(elev_group = cut_number(elevation_elevation, 5),
+         elev_group = case_when(elev_group == elev_groups[1] ~ "lowest",
+                                elev_group == elev_groups[2] ~ "low",
+                                elev_group == elev_groups[3] ~ "middle",
+                                elev_group == elev_groups[4] ~ "high",
+                                elev_group == elev_groups[5] ~ "highest"),
+         elev_group = factor(elev_group, levels = c("lowest", "low", "middle", "high", "highest"))) |>
+  ggplot(aes(elev_group, contest_rhum_sig995_14d_rhum)) +
+  geom_boxplot(aes(fill = elev_group), outlier.alpha = 0.1, show.legend = F) +
+  theme_custom +
+  labs(x = "elevation group", y = "relative humidity",
+       title = "boxplots of relative humidity by elevation group")
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-27-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### visualizing relationship between relative humidity and measured precipitation
+
+``` r
+train |>
+  slice_sample(prop = 0.1) |>
+  ggplot(aes(contest_rhum_sig995_14d_rhum, contest_precip_14d_precip)) +
+  geom_point() +
+  geom_smooth(formula = y ~ x, method = "loess", se = F, col = "springgreen4") +
+  theme_custom +
+  labs(x = "relative humidity", y = "measured precipitation",
+       title = "scatterplot of humidity and precipitation")
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### visualizing temperature trends
+
+``` r
+train |>
+  group_by(startdate) |>
+  summarise(mean_temp = mean(contest_tmp2m_14d_tmp2m)) |>
+  mutate(temp_diff = mean_temp - lag(mean_temp),
+         category = ifelse(temp_diff > 0, "warmer", "colder")) |>
+  na.omit() |>
+  ggplot(aes(startdate, temp_diff)) +
+  geom_col(aes(fill = category)) +
+  scale_fill_manual(values = c("#ADB8DF", "#CA8484")) +
+  theme_custom +
+  labs(x = "date", y = "difference temperature from past day", fill = "colder/warmer than day before",
+       title = "time series of differences in daily average temperature") +
+  theme(legend.position = "top")
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### visualizing temperature by season
+
+``` r
+train |>
+  mutate(season = case_when(month %in% c(12, 1, 2) ~ "winter",
+                            month %in% 3:5 ~ "spring",
+                            month %in% 6:8 ~ "summer",
+                            month %in% 9:11 ~ "fall"),
+         season = factor(season, levels = c("summer", "fall", "winter", "spring"))) |>
+  group_by(lat, lon, season) |>
+  summarise(mean_temp = mean(contest_tmp2m_14d_tmp2m),
+            .groups = "drop") |>
+  ggplot(aes(lon, lat)) +
+  geom_point(aes(col = mean_temp), size = 2) +
+  scale_color_gradient(high = "#D58989", low = "#A6C2E2") +
+  facet_wrap(vars(season)) +
+  theme_custom +
+  labs(x = "longitude", y = "latitude", title = "mapping temperature by season", col = "temperature")
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
+
+------------------------------------------------------------------------
 
 ### script runtime
 
@@ -552,4 +686,4 @@ train |>
 tictoc::toc()
 ```
 
-    ## 80.258 sec elapsed
+    ## 76.8 sec elapsed
