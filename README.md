@@ -1,12 +1,5 @@
 wids datathon 2023
 ================
-chad allison
-2023-01-31
-
-------------------------------------------------------------------------
-
-[kaggle
-link](https://www.kaggle.com/competitions/widsdatathon2023/overview)
 
 ------------------------------------------------------------------------
 
@@ -22,6 +15,8 @@ library(lubridate)
 library(skimr)
 library(patchwork)
 library(ggridges)
+library(finetune)
+library(vip)
 options(scipen = 999)
 
 theme_custom = theme_avatar() +
@@ -36,12 +31,15 @@ theme_custom = theme_avatar() +
 
 ``` r
 train = read_csv("train_data.csv", col_types = cols()) |> clean_names()
+# USING ONLY A TENTH OF THE DATA FOR RUNTIME PURPOSES
+# DATATHON SUBMISSION WAS MADE USING ALL DATA
+train = train |> slice_sample(prop = 0.1) # compute time
 test = read_csv("test_data.csv", col_types = cols()) |> clean_names()
 sample_sol = read_csv("sample_solution.csv", col_types = cols()) |> clean_names()
 paste0("training dimensions: ", nrow(train), " rows x ", ncol(train), " columns")
 ```
 
-    ## [1] "training dimensions: 375734 rows x 246 columns"
+    ## [1] "training dimensions: 37573 rows x 246 columns"
 
 ``` r
 paste0("testing dimensions: ", nrow(test), " rows x ", ncol(test), " columns")
@@ -81,7 +79,7 @@ train |>
 |                                                  |                            |
 |:-------------------------------------------------|:---------------------------|
 | Name                                             | select(train, startdate, … |
-| Number of rows                                   | 375734                     |
+| Number of rows                                   | 37573                      |
 | Number of columns                                | 5                          |
 | \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_   |                            |
 | Column type frequency:                           |                            |
@@ -97,21 +95,21 @@ Data summary
 
 | skim_variable | n_missing | complete_rate | min        | max        | median     | n_unique |
 |:--------------|----------:|--------------:|:-----------|:-----------|:-----------|---------:|
-| startdate     |         0 |             1 | 2014-09-01 | 2016-08-31 | 2015-09-01 |      731 |
+| startdate     |         0 |             1 | 2014-09-01 | 2016-08-31 | 2015-09-03 |      731 |
 
 **Variable type: factor**
 
-| skim_variable  | n_missing | complete_rate | ordered | n_unique | top_counts                                      |
-|:---------------|----------:|--------------:|:--------|---------:|:------------------------------------------------|
-| climate_region |         0 |             1 | FALSE   |       15 | BSk: 139621, Dfb: 52632, Cfa: 51901, Csb: 40936 |
+| skim_variable  | n_missing | complete_rate | ordered | n_unique | top_counts                                  |
+|:---------------|----------:|--------------:|:--------|---------:|:--------------------------------------------|
+| climate_region |         0 |             1 | FALSE   |       15 | BSk: 13967, Cfa: 5268, Dfb: 5252, Csb: 4029 |
 
 **Variable type: numeric**
 
 | skim_variable | n_missing | complete_rate |    mean |   sd |   p0 |  p25 |  p50 |  p75 | p100 | hist  |
 |:--------------|----------:|--------------:|--------:|-----:|-----:|-----:|-----:|-----:|-----:|:------|
-| year          |         0 |             1 | 2015.17 | 0.69 | 2014 | 2015 | 2015 | 2016 | 2016 | ▃▁▇▁▆ |
-| month         |         0 |             1 |    6.52 | 3.45 |    1 |    4 |    7 |   10 |   12 | ▇▅▅▅▇ |
-| day           |         0 |             1 |   15.74 | 8.80 |    1 |    8 |   16 |   23 |   31 | ▇▇▇▇▆ |
+| year          |         0 |             1 | 2015.17 | 0.69 | 2014 | 2015 | 2015 | 2016 | 2016 | ▂▁▇▁▆ |
+| month         |         0 |             1 |    6.51 | 3.46 |    1 |    4 |    7 |   10 |   12 | ▇▅▆▅▇ |
+| day           |         0 |             1 |   15.77 | 8.83 |    1 |    8 |   16 |   23 |   31 | ▇▇▇▇▆ |
 
 ------------------------------------------------------------------------
 
@@ -162,7 +160,6 @@ vars_with_NAs = data.frame(col = names(train), n = colSums(is.na(train))) |>
 
 train |>
   select(index, all_of(vars_with_NAs)) |>
-  head(nrow(train) * 0.05) |> # REMOVE THIS LINE
   pivot_longer(cols = -index, names_to = "var_name", values_to = "value") |>
   mutate(is_na = is.na(value)) |>
   ggplot(aes(var_name, index)) +
@@ -284,7 +281,7 @@ shapiro_sample
     ##  Shapiro-Wilk normality test
     ## 
     ## data:  sample(pull(train, contest_tmp2m_14d_tmp2m), 5000)
-    ## W = 0.99082, p-value < 0.00000000000000022
+    ## W = 0.9916, p-value < 0.00000000000000022
 
 because of the p-value less than 0.05, we cannot assume that the
 population this data is sampled from is normally distributed.
@@ -384,7 +381,7 @@ train |>
 
 ``` r
 fig_df = train |>
-  sample_n(10000) |>
+  # sample_n(10000) |>
   select(where(is.numeric)) |>
   cor() |>
   data.frame() |>
@@ -458,7 +455,7 @@ ordered_months = c("2014-9", "2014-10", "2014-11", "2014-12",
                    "2016-5", "2016-6", "2016-7", "2016-8")
 
 train |>
-  slice_sample(prop = 0.1) |>
+  # slice_sample(prop = 0.1) |>
   mutate(month2 = paste0(year, "-", month),
          month2 = factor(month2, levels = rev(ordered_months))) |>
   ggplot(aes(contest_tmp2m_14d_tmp2m, month2)) +
@@ -479,7 +476,7 @@ train |>
 cor_val = round(cor(train$contest_precip_14d_precip, train$contest_tmp2m_14d_tmp2m), 3)
 
 train |>
-  slice_sample(prop = 0.1) |>
+  # slice_sample(prop = 0.1) |>
   ggplot(aes(contest_precip_14d_precip, contest_tmp2m_14d_tmp2m)) +
   geom_point(alpha = 0.25) +
   geom_smooth(formula = y ~ x, method = "lm", col = "springgreen4") +
@@ -545,7 +542,7 @@ indicates](https://en.wikipedia.org/wiki/K%C3%B6ppen_climate_classification#:~:t
 
 ``` r
 train |>
-  slice_sample(prop = 0.1) |>
+  # slice_sample(prop = 0.1) |>
   ggplot(aes(contest_tmp2m_14d_tmp2m, contest_rhum_sig995_14d_rhum)) +
   geom_point(aes(col = climate_region)) +
   theme_custom +
@@ -562,7 +559,7 @@ train |>
 
 ``` r
 train |>
-  slice_sample(prop = 0.01) |>
+  # slice_sample(prop = 0.1) |>
   ggplot(aes(contest_tmp2m_14d_tmp2m, contest_rhum_sig995_14d_rhum)) +
   geom_point() +
   geom_smooth(formula = y ~ x, method = "loess", se = F, col = "springgreen4", linewidth = 2) +
@@ -621,7 +618,7 @@ train |>
 
 ``` r
 train |>
-  slice_sample(prop = 0.1) |>
+  # slice_sample(prop = 0.1) |>
   ggplot(aes(contest_rhum_sig995_14d_rhum, contest_precip_14d_precip)) +
   geom_point() +
   geom_smooth(formula = y ~ x, method = "loess", se = F, col = "springgreen4") +
@@ -680,10 +677,266 @@ train |>
 
 ------------------------------------------------------------------------
 
+### final variable adjustments before model pre-processing
+
+``` r
+train = train |>
+  select(-c(day, year)) |>
+  mutate(month = factor(month, label = T))
+```
+
+------------------------------------------------------------------------
+
+### feature selection
+
+``` r
+library(caret)
+set.seed(123)
+rPartMod = train(contest_tmp2m_14d_tmp2m ~ ., data = slice_sample(train, prop = 0.1), method = "rpart")
+included_vars = varImp(rPartMod)[[1]] |> filter(Overall > 0) |> rownames()
+included_vars
+```
+
+    ##  [1] "nmme_tmp2m_34w_cfsv2"     "nmme_tmp2m_34w_gfdlflora"
+    ##  [3] "nmme_tmp2m_34w_gfdlflorb" "nmme_tmp2m_34w_nasa"     
+    ##  [5] "nmme_tmp2m_34w_nmmemean"  "nmme_tmp2m_56w_cfsv2"    
+    ##  [7] "nmme_tmp2m_56w_gfdlflora" "nmme_tmp2m_56w_gfdlflorb"
+    ##  [9] "nmme_tmp2m_56w_nasa"      "nmme_tmp2m_56w_nmmemean"
+
+------------------------------------------------------------------------
+
+### creating final training set for modeling
+
+``` r
+train_pre_selection = train
+train = train |> select(contest_tmp2m_14d_tmp2m, index, lat, lon, startdate, all_of(included_vars))
+glimpse(train)
+```
+
+    ## Rows: 37,573
+    ## Columns: 15
+    ## $ contest_tmp2m_14d_tmp2m  <dbl> -1.08989184, 21.77181762, 0.01595693, 1.99213~
+    ## $ index                    <dbl> 102843, 200979, 341518, 48421, 84205, 245869,~
+    ## $ lat                      <dbl> 0.40909091, 0.63636364, 0.95454545, 0.2727272~
+    ## $ lon                      <dbl> 0.6000000, 0.2666667, 0.1666667, 0.7000000, 0~
+    ## $ startdate                <date> 2016-01-17, 2016-07-17, 2015-01-20, 2015-02-~
+    ## $ nmme_tmp2m_34w_cfsv2     <dbl> -3.95, 22.09, -4.80, 10.06, 1.47, 7.96, 4.43,~
+    ## $ nmme_tmp2m_34w_gfdlflora <dbl> -3.59, 23.33, -2.75, 9.04, 2.17, 2.52, 3.77, ~
+    ## $ nmme_tmp2m_34w_gfdlflorb <dbl> -3.51, 22.52, -4.40, 8.50, 2.39, 2.76, 4.60, ~
+    ## $ nmme_tmp2m_34w_nasa      <dbl> -3.41, 28.38, -10.94, 9.64, 2.09, 14.40, 6.95~
+    ## $ nmme_tmp2m_34w_nmmemean  <dbl> -3.49, 24.34, -4.99, 8.43, 1.06, 7.66, 4.33, ~
+    ## $ nmme_tmp2m_56w_cfsv2     <dbl> -3.95, 22.09, -5.00, 7.83, 1.23, 7.96, 4.43, ~
+    ## $ nmme_tmp2m_56w_gfdlflora <dbl> -3.59, 23.33, -2.73, 7.60, 2.00, 2.52, 3.77, ~
+    ## $ nmme_tmp2m_56w_gfdlflorb <dbl> -3.51, 22.52, -4.53, 7.91, 2.26, 2.76, 4.60, ~
+    ## $ nmme_tmp2m_56w_nasa      <dbl> -3.41, 28.38, -11.20, 8.27, 1.89, 14.40, 6.95~
+    ## $ nmme_tmp2m_56w_nmmemean  <dbl> -3.49, 24.34, -5.15, 7.08, 0.89, 7.66, 4.33, ~
+
+------------------------------------------------------------------------
+
+### creating data split
+
+``` r
+set.seed(123)
+data_split = initial_split(train, prop = 0.75, strata = contest_tmp2m_14d_tmp2m)
+train_data = training(data_split)
+test_data = testing(data_split)
+
+set.seed(234)
+cv_folds = vfold_cv(train_data, v = 5, strata = contest_tmp2m_14d_tmp2m)
+paste0("training data: ", nrow(train_data), " observations")
+```
+
+    ## [1] "training data: 28177 observations"
+
+``` r
+paste0("testing data: ", nrow(test_data), " observations")
+```
+
+    ## [1] "testing data: 9396 observations"
+
+------------------------------------------------------------------------
+
+### data preprocessing
+
+``` r
+climate_rec = recipe(contest_tmp2m_14d_tmp2m ~ ., data = train_data) |>
+  update_role(index, lat, lon, startdate, new_role = "ID") |>
+  step_normalize(all_numeric(), -all_outcomes(), -index, -lat, -lon, -startdate)
+
+summary(climate_rec)
+```
+
+    ## # A tibble: 15 x 4
+    ##    variable                 type      role      source  
+    ##    <chr>                    <list>    <chr>     <chr>   
+    ##  1 index                    <chr [2]> ID        original
+    ##  2 lat                      <chr [2]> ID        original
+    ##  3 lon                      <chr [2]> ID        original
+    ##  4 startdate                <chr [1]> ID        original
+    ##  5 nmme_tmp2m_34w_cfsv2     <chr [2]> predictor original
+    ##  6 nmme_tmp2m_34w_gfdlflora <chr [2]> predictor original
+    ##  7 nmme_tmp2m_34w_gfdlflorb <chr [2]> predictor original
+    ##  8 nmme_tmp2m_34w_nasa      <chr [2]> predictor original
+    ##  9 nmme_tmp2m_34w_nmmemean  <chr [2]> predictor original
+    ## 10 nmme_tmp2m_56w_cfsv2     <chr [2]> predictor original
+    ## 11 nmme_tmp2m_56w_gfdlflora <chr [2]> predictor original
+    ## 12 nmme_tmp2m_56w_gfdlflorb <chr [2]> predictor original
+    ## 13 nmme_tmp2m_56w_nasa      <chr [2]> predictor original
+    ## 14 nmme_tmp2m_56w_nmmemean  <chr [2]> predictor original
+    ## 15 contest_tmp2m_14d_tmp2m  <chr [2]> outcome   original
+
+------------------------------------------------------------------------
+
+### building model specification and workflow
+
+``` r
+xgb_spec = boost_tree(trees = tune(), min_n = tune(), learn_rate = 0.25) |>
+  set_engine("xgboost") |>
+  set_mode("regression")
+
+xgb_wf = workflow(climate_rec, xgb_spec)
+xgb_wf
+```
+
+    ## == Workflow ====================================================================
+    ## Preprocessor: Recipe
+    ## Model: boost_tree()
+    ## 
+    ## -- Preprocessor ----------------------------------------------------------------
+    ## 1 Recipe Step
+    ## 
+    ## * step_normalize()
+    ## 
+    ## -- Model -----------------------------------------------------------------------
+    ## Boosted Tree Model Specification (regression)
+    ## 
+    ## Main Arguments:
+    ##   trees = tune()
+    ##   min_n = tune()
+    ##   learn_rate = 0.25
+    ## 
+    ## Computational engine: xgboost
+
+------------------------------------------------------------------------
+
+### tuning the model
+
+``` r
+doParallel::registerDoParallel()
+set.seed(345)
+
+xgb_climate_rs = tune_grid(xgb_wf, cv_folds, grid = 10,
+                           control = control_race(verbose_elim = T, pkgs = "stringr"))
+
+xgb_climate_rs
+```
+
+    ## # Tuning results
+    ## # 5-fold cross-validation using stratification 
+    ## # A tibble: 5 x 4
+    ##   splits               id    .metrics          .notes          
+    ##   <list>               <chr> <list>            <list>          
+    ## 1 <split [22541/5636]> Fold1 <tibble [20 x 6]> <tibble [0 x 1]>
+    ## 2 <split [22541/5636]> Fold2 <tibble [20 x 6]> <tibble [0 x 1]>
+    ## 3 <split [22541/5636]> Fold3 <tibble [20 x 6]> <tibble [0 x 1]>
+    ## 4 <split [22541/5636]> Fold4 <tibble [20 x 6]> <tibble [0 x 1]>
+    ## 5 <split [22544/5633]> Fold5 <tibble [20 x 6]> <tibble [0 x 1]>
+
+------------------------------------------------------------------------
+
+### showing best models
+
+``` r
+show_best(xgb_climate_rs, metric = "rmse")
+```
+
+    ## # A tibble: 5 x 8
+    ##   trees min_n .metric .estimator  mean     n std_err .config              
+    ##   <int> <int> <chr>   <chr>      <dbl> <int>   <dbl> <chr>                
+    ## 1  1897    17 rmse    standard    2.24     5  0.0166 Preprocessor1_Model05
+    ## 2  1603    12 rmse    standard    2.25     5  0.0173 Preprocessor1_Model03
+    ## 3   703     6 rmse    standard    2.25     5  0.0174 Preprocessor1_Model01
+    ## 4  1465    16 rmse    standard    2.25     5  0.0150 Preprocessor1_Model04
+    ## 5  1225    24 rmse    standard    2.26     5  0.0136 Preprocessor1_Model06
+
+------------------------------------------------------------------------
+
+### selecting best model
+
+``` r
+xgb_last = xgb_wf |>
+  finalize_workflow(select_best(xgb_climate_rs, "rmse")) |>
+  last_fit(data_split)
+
+xgb_last
+```
+
+    ## # Resampling results
+    ## # Manual resampling 
+    ## # A tibble: 1 x 6
+    ##   splits               id               .metrics .notes   .predicti~1 .workflow 
+    ##   <list>               <chr>            <list>   <list>   <list>      <list>    
+    ## 1 <split [28177/9396]> train/test split <tibble> <tibble> <tibble>    <workflow>
+    ## # ... with abbreviated variable name 1: .predictions
+
+------------------------------------------------------------------------
+
+### getting variable importance
+
+``` r
+xgb_fit = extract_fit_parsnip(xgb_last)
+vip(xgb_fit, geom = "point", num_features = 10) + theme_custom
+```
+
+![](wids_files/figure-gfm/unnamed-chunk-40-1.png)<!-- -->
+
+------------------------------------------------------------------------
+
+### fitting final model and making predictions on test set
+
+``` r
+best_tune = show_best(xgb_climate_rs, metric = "rmse") |>
+  slice_min(mean)
+
+n_trees = pull(best_tune, trees)
+n_min_n = pull(best_tune, min_n)
+
+data_recipe = recipe(contest_tmp2m_14d_tmp2m ~ ., data = train_data) |>
+  update_role(index, lat, lon, startdate, new_role = "ID") |>
+  step_normalize(all_numeric(), -all_outcomes(), -index, -lat, -lon, -startdate)
+
+data_processed = prep(data_recipe) |>
+  bake(train_data)
+
+model = boost_tree(trees = n_trees, min_n = n_min_n, learn_rate = 0.25) |>
+  set_engine("xgboost") |>
+  set_mode("regression")
+
+model_fit = fit(model, contest_tmp2m_14d_tmp2m ~ ., data = data_processed)
+test = mutate(test, startdate = as_date(startdate, format = "%m/%d/%y"))
+
+test_processed = prep(data_recipe) |>
+  bake(test)
+
+new_preds = predict(model_fit, new_data = test_processed)
+final_df = data.frame(index = as.integer(test_processed$index), new_preds)
+colnames(final_df) = c("index", "contest-tmp2m-14d__tmp2m")
+write_csv(final_df, "submission.csv")
+
+sample_n(final_df, 5)
+```
+
+    ##    index contest-tmp2m-14d__tmp2m
+    ## 1 398356                 7.889651
+    ## 2 378093                15.624765
+    ## 3 388108                12.922503
+    ## 4 385817                19.644913
+    ## 5 377075                13.028264
+
 ### script runtime
 
 ``` r
 tictoc::toc()
 ```
 
-    ## 76.8 sec elapsed
+    ## 498.87 sec elapsed
